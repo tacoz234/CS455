@@ -11,42 +11,38 @@ to check the socket status of listening TCP sockets
 
 #include <time.h>
 
-void    TCPdaytimed( int fd );
+void TCPdaytimed(int fd);
 
-#define QLEN        32
-#define MAXSTRLEN   256
+#define QLEN 32
+#define MAXSTRLEN 256
 
-int	    masterSkt ;      // Listening socket
-int	    connectedSkt ;   // Connected socket
+int masterSkt;    // Listening socket
+int connectedSkt; // Connected socket
 
 //------------------------------------------------------------
-//  Hanld SIGINT  or SIGTERM 
+//  Hanld SIGINT  or SIGTERM
 //------------------------------------------------------------
-void goodbye(int sig) 
-{
-    /* Mission Accomplished */
-    printf( "\n### The TCP daytime Server (pid = %d) have been " , getpid() );  
-    switch( sig )
-    {
-        case SIGTERM:
-            printf("nicely asked to TERMINATE by SIGTERM ( %d ).\n" , sig );
-            break ;
+void goodbye(int sig) {
+  /* Mission Accomplished */
+  printf("\n### The TCP daytime Server (pid = %d) have been ", getpid());
+  switch (sig) {
+  case SIGTERM:
+    printf("nicely asked to TERMINATE by SIGTERM ( %d ).\n", sig);
+    break;
 
-        case SIGINT:   // Ctrl-C
-            printf("INTERRUPTED by SIGINT ( %d )\n" , sig );
-            break ;
-            
-        default:
-            printf("unexpectedly SIGNALed by ( %d )\n" , sig );
+  case SIGINT: // Ctrl-C
+    printf("INTERRUPTED by SIGINT ( %d )\n", sig);
+    break;
 
-    }
+  default:
+    printf("unexpectedly SIGNALed by ( %d )\n", sig);
+  }
 
+  // Close any possibly open sockets
 
-    // Close any possibly open sockets
+  printf("\nGoodbye\n\n");
 
-    printf( "\nGoodbye\n\n" );  
-
-    exit(0) ;     
+  exit(0);
 }
 
 /*------------------------------------------------------------------------
@@ -54,38 +50,39 @@ void goodbye(int sig)
  *------------------------------------------------------------------------
  */
 
-int main(int argc, char *argv[])
-{
-    struct  sockaddr_in cliSock ;       // the from address of a client	
-    unsigned short      srvPort = 13 ;  // Default server port 
-    unsigned int        alen;           // The from-address length
-    
-	switch ( argc ) 
-	{
+int main(int argc, char *argv[]) {
+  struct sockaddr_in cliSock;  // the from address of a client
+  unsigned short srvPort = 13; // Default server port
+  unsigned int alen;           // The from-address length
 
-        // MISSING CODE
+  switch (argc) {
 
-      default:
-        err_quit("usage: command [port]\n");
-    }
+  case 2:
+    srvPort = atoi(argv[1]);
+    break;
 
-	masterSkt = socketTCP( /* MISSING CODE */ ) ;
+  default:
+    err_quit("usage: command [port]\n");
+  }
 
-    // Prepare to handle signals
-    
-    // Start lissining at masterSkt 
-    
-    
-	while ( 1 ) 
-	{
-		alen  = sizeof( cliSock );
-		connectedSkt = Accept(  /* MISSING CODE */ );
+  masterSkt = socketTCP(srvPort, NULL, 0);
 
-		TCPdaytimed( connectedSkt );
+  // Prepare to handle signals
+  sigactionWrapper(SIGINT, goodbye);
+  sigactionWrapper(SIGTERM, goodbye);
 
-		Close( connectedSkt );   // a utility function to serve this client
-        
-	} // serve the next client
+  // Start lissining at masterSkt
+  Listen(masterSkt, QLEN);
+
+  while (1) {
+    alen = sizeof(cliSock);
+    connectedSkt = Accept(masterSkt, (SA *)&cliSock, &alen);
+
+    TCPdaytimed(connectedSkt);
+
+    Close(connectedSkt); // a utility function to serve this client
+
+  } // serve the next client
 }
 
 /*------------------------------------------------------------------------
@@ -93,28 +90,31 @@ int main(int argc, char *argv[])
  *------------------------------------------------------------------------
  */
 
-#define MAX_BUF_SZ  200
+#define MAX_BUF_SZ 200
 
-void TCPdaytimed( int sd )
-{
-    char   *pts ;       /* pointer to time string   */
-    time_t  now ;       /* current time             */
-	char    ipStr[20] ;
+void TCPdaytimed(int sd) {
+  char *pts;  /* pointer to time string   */
+  time_t now; /* current time             */
+  char ipStr[20];
 
-    struct  sockaddr_in  clientSocket ;
+  struct sockaddr_in clientSocket;
 
-    //  Who is calling?
-    int alen = sizeof( clientSocket ) ;
-    
-    // MISSING CODE
-    
-    printf("\nServing client at %s : %hu\n" , /* Client's IP addr */ , /* Client's port*/  ) ;
+  //  Who is calling?
+  int alen = sizeof(clientSocket);
 
-	time( &now ) ;
-	pts = ctime( &now );    /* WARNING! ctime() is NOT thread-safe */
+  //  Who is calling?
+  if (getpeername(sd, (SA *)&clientSocket, &alen) < 0) {
+    err_sys("getpeername() failed");
+  }
+  inet_ntop(AF_INET, &clientSocket.sin_addr, ipStr, sizeof(ipStr));
 
-    unsigned char buff[ MAX_BUF_SZ ] ;
-    snprintf( buff , MAX_BUF_SZ , "CustomBuilt DT server: %s" , pts );
+  printf("\nServing client at %s : %hu\n", ipStr, ntohs(clientSocket.sin_port));
 
-	writen( sd, buff, strlen( buff ) ) ;
+  time(&now);
+  pts = ctime(&now); /* WARNING! ctime() is NOT thread-safe */
+
+  unsigned char buff[MAX_BUF_SZ];
+  snprintf(buff, MAX_BUF_SZ, "CustomBuilt DT server: %s", pts);
+
+  writen(sd, buff, strlen(buff));
 }
